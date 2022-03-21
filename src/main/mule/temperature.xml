@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="ef4e6536-0032-4d7c-b4a8-9a7e2569ac47" >
+		<http:listener-connection host="0.0.0.0" port="${port}" />
+	</http:listener-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="b09f3aea-f380-4bd0-863a-7fce9f9a2a28" file="config.properties" />
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="5328939b-b16a-4f24-b71d-4161f4997860" />
+	<flow name="temperatureFlow" doc:id="94980525-6fd0-45d0-a6c4-159640786ebb" >
+		<http:listener doc:name="Listener" doc:id="53fc507a-b9a1-464a-ae0f-eaed07965fc5" config-ref="HTTP_Listener_config" path="/test"/>
+		<logger level="INFO" doc:name="Logger" doc:id="3398b493-924f-463a-9e60-127aa50e7ce2" message='#["Application Started"]'/>
+		<set-variable value="#[payload.city]" doc:name="City" doc:id="16e1c6cc-8fd3-4d69-a233-fa5d11d36554" variableName="City"/>
+		<set-variable value="#[payload.RequesterName]" doc:name="Name" doc:id="8238ea84-943a-468b-9c21-872a7dd1e0f7" variableName="Name"/>
+		<scatter-gather doc:name="Scatter-Gather" doc:id="8d37f527-d243-4da3-8808-92488b00bb56" >
+			<route >
+				<set-variable value="#[vars.City[0]]" doc:name="FirstCity" doc:id="6105298a-0d6d-4824-92bc-d42abcb4a830" variableName="FirstCity"/>
+				<http:request method="GET" doc:name="Request" doc:id="739ec5fe-a94e-4933-8064-81109b79b8d9" config-ref="HTTP_Request_configuration" url="http://api.openweathermap.org/data/2.5/weather">
+					<http:query-params ><![CDATA[#[output application/java
+---
+{
+	q : vars.FirstCity,
+	appid : "be9aeece95c610a5a807aa1ad1c54acb"
+}]]]></http:query-params>
+				</http:request>
+			</route>
+			<route >
+				<set-variable value="#[vars.City[1]]" doc:name="SecondCity" doc:id="d9231f3a-b7ff-4f1e-9018-fdb18ea8574a" variableName="SecondCity"/>
+				<http:request method="GET" doc:name="Request" doc:id="c7723ce8-33c2-45bd-98f3-5bb3cf4a0983" config-ref="HTTP_Request_configuration" url="http://api.openweathermap.org/data/2.5/weather">
+					<http:query-params ><![CDATA[#[output application/java
+---
+{
+	q : vars.SecondCity,
+	appid : "be9aeece95c610a5a807aa1ad1c54acb"
+}]]]></http:query-params>
+				</http:request>
+			</route>
+		</scatter-gather>
+		<ee:transform doc:name="Transform Message" doc:id="5fd1a0f8-d292-4abc-bafd-91492866fd78" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Requester Name" : vars.Name,
+"City" :[{
+	"FirstCity" : payload[0].payload.name,
+	"Miniumum Temp" : (payload[0].payload.main.temp_min as Number) - 273.15 ++ " Degree Celcius",
+	"Maximum Temp" : (payload[0].payload.main.temp_max as Number) - 273.15 ++ " Degree Celcius"
+	
+	},
+	{
+	"SecondCity" : payload[1].payload.name,
+	"Miniumum Temp" : (payload[1].payload.main.temp_min as Number) - 273.15 ++ " Degree Celcius",
+	"Maximum Temp" : (payload[1].payload.main.temp_max as Number) - 273.15 ++ " Degree Celcius"
+}]
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
